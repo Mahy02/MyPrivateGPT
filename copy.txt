@@ -225,9 +225,39 @@ if __name__ == '__main__':
 
 
 
+/* New styles for rounded corners and colors */
+.chat-message {
+    border-radius: 1.5rem;
+    overflow: hidden;
+}
+
+.chat-message.user .message {
+    background-color:#00323D ;
+    border-top-right-radius: 0;
+}
+
+.chat-message.bot .message {
+    background-color:#D3E4E8 ;
+    border-top-left-radius: 0;
+}
+
+.chat-message.user .avatar img {
+    border-top-left-radius: 1.5rem;
+}
+
+.chat-message.bot .avatar img {
+    border-top-right-radius: 1.5rem;
+}
 
 
 
 
 
+## Text input template
+# text_input_template = '''
+# <div class="text-input-container">
+#     <input type="text" placeholder="Ask a Question about your documents" id="user-question" style="flex: 1; border: none; outline: none; font-size: 16px; padding: 10px;">
+#     <button onclick="submitQuestion()" style="margin-left: 10px; padding: 10px 20px; background-color: #4CAF50; color: #fff; border: none; border-radius: 20px; cursor: pointer;">Submit</button>
+# </div>
+# '''
 

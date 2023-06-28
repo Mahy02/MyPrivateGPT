@@ -9,8 +9,12 @@
 #                                  * pip install huggingface_hub     : Our Model
 
 import streamlit as st
+from io import TextIOWrapper, StringIO, BytesIO
+from typing import Union
+from typing import List
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
+import csv
 from langchain.text_splitter import CharacterTextSplitter
 #from langchain.embeddings import OpenAIEmbeddings, HuggingFaceInstructEmbeddings,
 from langchain.embeddings import HuggingFaceEmbeddings
@@ -18,7 +22,8 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-from htmlTemplates import css, bot_template, user_template, text_input_template
+from htmlTemplates import css, bot_template, user_template
+
 import argparse
 #from constants import CHROMA_SETTINGS
 from langchain.docstore.document import Document
@@ -42,7 +47,6 @@ from langchain.document_loaders import (
 )
 
 
-
 #embeddings_model_name = os.environ.get("EMBEDDINGS_MODEL_NAME")
 persist_directory = os.environ.get('PERSIST_DIRECTORY')
 model_type = os.environ.get('MODEL_TYPE')
@@ -64,35 +68,102 @@ LOADER_MAPPING = {
 }
 
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='privateGPT: Ask questions to your documents without an internet connection, '
-                                                 'using the power of LLMs.')
-    parser.add_argument("--hide-source", "-S", action='store_true',
-                        help='Use this flag to disable printing of source documents used for answers.')
+# def parse_arguments():
+#     parser = argparse.ArgumentParser(description='privateGPT: Ask questions to your documents without an internet connection, '
+#                                                  'using the power of LLMs.')
+#     parser.add_argument("--hide-source", "-S", action='store_true',
+#                         help='Use this flag to disable printing of source documents used for answers.')
 
-    parser.add_argument("--mute-stream", "-M",
-                        action='store_true',
-                        help='Use this flag to disable the streaming StdOut callback for LLMs.')
+#     parser.add_argument("--mute-stream", "-M",
+#                         action='store_true',
+#                         help='Use this flag to disable the streaming StdOut callback for LLMs.')
 
-    return parser.parse_args()
+#     return parser.parse_args()
 
-#The function takes our pdf docs [list of pdf files] and retruns a single String of text wth all of the text content of those pdfs
-def get_pdf_text(pdf_docs):
-    text =""
-    for pdf in pdf_docs:
-        #Pdf reader object creates pdf object that has pages
-        pdf_reader = PdfReader(pdf)
-        #now we will loop through the pages and read the content
-        for page in pdf_reader.pages:
-            #extrating all raw text
-            text+=page.extract_text()
-    return text
+# -------------------------------------------Processing Documents---------------------------------------
+
+def get_file_extension(file_name: str) -> str:
+    _, ext = os.path.splitext(file_name)
+    return ext.lower()
+
+# #The function takes our pdf docs [list of pdf files] and retruns a single String of text wth all of the text content of those pdfs
+def get_pdf_text(pdf):
+    content =""
+    #Pdf reader object creates pdf object that has pages
+    pdf_reader = PdfReader(pdf)
+    #now we will loop through the pages and read the content
+    for page in pdf_reader.pages:
+        #extrating all raw text
+        content+=page.extract_text()
+    return content
 #end get_pdf_text fn
+
+
+
+
+def get_csv_text(csv_file: Union[str, bytes, BytesIO]):
+    content = ""
+    # Open CSV file and read data
+    if isinstance(csv_file, str):
+        with open(csv_file, newline='') as f:
+            reader = csv.reader(f)
+            # Loop through rows and join into a single string
+            for row in reader:
+                content += ",".join(row) + "\n"
+    else:
+        # Convert bytes to TextIOWrapper object
+        file_obj = StringIO(csv_file.decode('utf-8'))
+        # Read file contents using csv.reader
+        reader = csv.reader(file_obj)
+        # Loop through rows and join into a single string
+        for row in reader:
+            content += ",".join(row) + "\n"
+    return content
+
+def load_txt_file(file) -> str:
+    # Read the TXT file and extract the text
+    with open(file.name, "r") as txt_file:
+        content = txt_file.read()
+
+    return content
+
+
+def load_documents(file_docs):
+    text = ""
+    print(file_docs)
+    print("=================================Before==================")
+    for file in file_docs:
+        print("=================================Inside==================")
+        file_extension = get_file_extension(file.name)
+        print(file_extension)
+        if(file_extension == '.pdf'):
+            raw_text = get_pdf_text(file)
+            print("inside pdf extensions")
+        #st.write(raw_text)   #to make sure the raw data appears
+        elif(file_extension == '.txt'):
+            raw_text= load_txt_file(file)
+            print("inside txt extensions")
+        elif(file_extension== '.csv'):
+            raw_text= get_csv_text(file.read())
+            print("inside csv extensions")
+        else:
+            st.warning('Please provide txt or pdf or csv files.', icon="⚠️")
+            return text
+        text+=raw_text
+    print("=================================After==================")
+    return text
+
+
+
+
+
 
 
 #the fn takes a string of text and returns a list of chunks of text to feed our DB
 #to divide text to chunks we need langchain library by using a class from it
 def get_text_chunks(raw_text):
+    if(raw_text == ""):
+        return
     text_splitter = CharacterTextSplitter(
         separator="\n",
         chunk_size=1000,  #1000 chars
@@ -105,6 +176,8 @@ def get_text_chunks(raw_text):
 
 #we get the vector store
 def get_vectorstore(text_chunks,embeddings_model_name):
+    if text_chunks==None:
+        return
     embeddings = HuggingFaceEmbeddings(model_name=embeddings_model_name)
     #embeddings= HuggingFaceInstructEmbeddings(model_name= "hkunlp/instructor-xl")
     vectorstore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
@@ -112,13 +185,20 @@ def get_vectorstore(text_chunks,embeddings_model_name):
 #end get_vectorstore
 
 
+
+
+#-----------------------------------------------------End of Processing Documents -------------------------------------
+
+
+#----------------------------------------------------Start conversation chain -------------------------------------
+
 def get_conversation_chain(vectorstore):
     #llm = OpenAI()
     #our Large Language Model:
     #llm = ChatOpenAI()
     # Prepare the LLM
     # Parse the command line arguments
-    args = parse_arguments()
+    #args = parse_arguments()
    # callbacks = [] if args.mute_stream else [StreamingStdOutCallbackHandler()]
     match model_type:
         case "LlamaCpp":
@@ -143,7 +223,14 @@ def get_conversation_chain(vectorstore):
     return conversation_chain
 #end get_conversation_chain
 
+#------------------------------------------------------End conversation chain ------------------------------
+
+
+#-----------------------------------------------------Rest of the functionalities --------------------------
 def handle_userinput(user_question):
+    if not user_question.strip():  # Check if user_question is empty or contains only whitespace
+        st.error("Please enter a question.")
+        return
     #converstation has info from vectorstore + memory
     response = st.session_state.conversation({'question': user_question})
     #response from language model
@@ -160,10 +247,11 @@ def handle_userinput(user_question):
             st.write(bot_template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
 #end handle_userinput
 
-
+#-------------------------------------------------------End of functions-------------------------------------------
 
 
 def main():
+
 
     #this function allows us to read the .env file tp get API keys
     load_dotenv()
@@ -172,9 +260,43 @@ def main():
 
     #------------------------------------GUI-----------------------------------
     #setting the page configuration:
-    st.set_page_config(page_title="Chat With Multiple Pdfs", page_icon=":books:")
+    st.set_page_config(page_title="PrivateGPT", page_icon=":books: :shushing_face:")
+    
+    # Set the background color for the sidebar
+    st.markdown("""
+        <style>
+            [data-testid=stSidebar] {
+                background-color: #0D6078;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+   
+    
+   #footer
+    foot = f"""
+    <div style="
+        position: fixed;
+        bottom: 0;
+        left: 30%;
+        right: 0;
+        width: 50%;
+        padding: 0px 0px;
+        text-align: center;
+    ">
+        <p>Made by <a href='https://github.com/Mahy02'>Mahinour Elsarky</a></p>
+    </div>
+    """
+
+    st.markdown(foot, unsafe_allow_html=True)
+    
+    
+    st.sidebar.image("images/private-chat.png", width=250)
+
+   
+    
 
     #Initializing the CSS
+    st.markdown(css, unsafe_allow_html=True)
     st.write(css, unsafe_allow_html= True)
 
     #initialize session state objects before
@@ -187,19 +309,31 @@ def main():
 
 
     #setting main header of app
-    #Show the header onlyy before conversation start
-    if st.session_state.conversation is None:
-        st.header("Chat with YOUR own PDFs privately :books: :lock: ")
+    st.header("Private Chat with YOUR own Files :books: :lock: \n (.txt, .pdf, .csv)  ")
     #st.header("Chat with YOUR own PDFs privately :books: :lock: ")
 
    
-    
+    st.markdown("""
+        <style>
 
+            .stTextInput input {
+                background-color: #FFFFFF;
+                height: 60px;
+                padding: 10px;
+                font-size: 20px;
+                color: #000000;
+                border: none;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
+    st.markdown('<label style="font-size: 24px; color: #FFFFFF;">Ask Questions to your files:</label>', unsafe_allow_html=True)
     #text input so users can add their questions:
-    user_question= st.text_input("Ask a Question about your documents:")
+    user_question= st.text_input("")
+    print(user_question)
     if user_question:
         handle_userinput(user_question)
-    #endif
+     
     
     
     #Side bar for chats
@@ -207,18 +341,37 @@ def main():
     with st.sidebar:
         st.subheader("Upload your Documents here and click on process")
 
-        #uploading files:
-        pdf_docs=  st.file_uploader("", accept_multiple_files= True)
 
-        #button:
+        
+        #uploading files:
+        uploaded_files=  st.file_uploader("", accept_multiple_files= True)
+       
+        
+        st.markdown("""
+            <style>
+                .stButton button {
+                    background-color: #ffffff; 
+                    color: #000000; 
+                    height: 50px;
+                    width: 100px;
+                    border: none;
+                    border-radius: 25px;
+                    text-transform: capitalize;
+                    font-weight: bold;
+                }
+            </style>
+            """, unsafe_allow_html=True)
+        
+
         #if user presses on it do a certain function
-        if st.button("Process"):
+        if st.button("PROCESS"):
+            
             #for the loading we use spinner 
             with st.spinner("Processing"):
-                #get pdf text
-                raw_text = get_pdf_text(pdf_docs)
-                #st.write(raw_text)   #to make sure the raw data appears
-
+  
+                #Load Documents as per their extension and get raw text
+                raw_text = load_documents(uploaded_files)
+               
                 #get text chunks         
                 text_chunks = get_text_chunks(raw_text)
                 #st.write(text_chunks)
