@@ -5,10 +5,12 @@ css = '''
     padding: 1.5rem; border-radius: 0.5rem; margin-bottom: 1rem; display: flex
 }
 .chat-message.user {
-    background-color: #00323D;
+    background-color: #0D6078;
+    color: #000000;
 }
 .chat-message.bot {
     background-color: #D3E4E8;
+    color: #000000;
 }
 .chat-message .avatar {
   width: 20%;
@@ -22,7 +24,7 @@ css = '''
 .chat-message .message {
   width: 100%;
   padding: 0 1.5rem;
-  color: #fff;
+  color: #000000;
 }
 
 .sidebar .sidebar-content {
