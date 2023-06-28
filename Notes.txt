@@ -1,0 +1,21 @@
+To run APP===> streamlit run app.py
+
+#Notes for mahy: ------------------------------------------------------------
+#when running streamlit app you dont type python app.py
+#you have to run using streamlit: streamlit run app.py
+#since we will be connecting to openai and huggingface through their APIs so we need their api keys
+#Brief explanation of langchain process:
+    #1. we load our pdfs
+    #2. we can think of pdf as a large string that is divided into chunks of text
+    #3. these chunks of data are converted into embeddings
+    #    embeddings are like vector representation of our chunks of data (01010) and its a numerical representation
+    #    embeddings dont only store the chunks of data but the meaning and semantics behind it
+    #4. All these embeddings are then stored into a database like chroma or faiss-cpu or pinecone(most popular)
+    #   the reason we used faiss is that it stores it locally instead of on a cloud (it will be erased when app closes)
+    #5. when user asks a question, its converted into embeddings by the same algo used to convert chunks of data into embeddings
+    #6. then a semantic search occurs in the database
+    #7. A ranked result coms out 
+    #8. These final ranked results are passed into the LLM (any model like openai, hugging face....etc)
+    #9. The LLM can finally give the answer
+#Who is the author of Harry Potter and The Chamber of Secrets?
+#------------------------------------------------------------------------------

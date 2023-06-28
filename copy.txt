@@ -18,10 +18,8 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
-from htmlTemplates import css, bot_template, user_template, text_input_template
+from htmlTemplates import css, bot_template, user_template
 import argparse
-#from constants import CHROMA_SETTINGS
-from langchain.docstore.document import Document
 
 #our language models:
 #from langchain.llms import OpenAI
@@ -34,13 +32,6 @@ import os
 
 #print("this comes from .env:", os.getenv('MODEL_TYPE'))
 
-from langchain.document_loaders import (
-    CSVLoader,
-    PyMuPDFLoader,
-    TextLoader,
-    UnstructuredWordDocumentLoader,
-)
-
 
 
 #embeddings_model_name = os.environ.get("EMBEDDINGS_MODEL_NAME")
@@ -50,18 +41,6 @@ model_path = os.environ.get('MODEL_PATH')
 model_n_ctx = os.environ.get('MODEL_N_CTX')
 model_n_batch = int(os.environ.get('MODEL_N_BATCH',8))
 target_source_chunks = int(os.environ.get('TARGET_SOURCE_CHUNKS',4))
-
-
-# Map file extensions to document loaders and their arguments
-LOADER_MAPPING = {
-    ".csv": (CSVLoader, {}),
-    # ".docx": (Docx2txtLoader, {}),
-    ".doc": (UnstructuredWordDocumentLoader, {}),
-    ".docx": (UnstructuredWordDocumentLoader, {}),
-    ".pdf": (PyMuPDFLoader, {}),
-    ".txt": (TextLoader, {"encoding": "utf8"}),
-    # Add more mappings for other file extensions and loaders as needed
-}
 
 
 def parse_arguments():
@@ -161,8 +140,6 @@ def handle_userinput(user_question):
 #end handle_userinput
 
 
-
-
 def main():
 
     #this function allows us to read the .env file tp get API keys
@@ -182,8 +159,6 @@ def main():
         st.session_state.conversation = None
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = None
-    
-    
 
 
     #setting main header of app
@@ -206,7 +181,6 @@ def main():
     #with is used for putting things inside your side bar
     with st.sidebar:
         st.subheader("Upload your Documents here and click on process")
-
         #uploading files:
         pdf_docs=  st.file_uploader("", accept_multiple_files= True)
 
