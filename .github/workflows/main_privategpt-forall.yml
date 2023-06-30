@@ -60,4 +60,4 @@ jobs:
         with:
           app-name: 'privateGPT-forall'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_212D782F3D2B41F185511077E771F959 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_800D666D716343BEACA815DF344E7EDA }}
